@@ -1,20 +1,33 @@
 import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
+import GroupInfo from './GroupInfo';
 
 export default function ChatWindow({ currentChat, currentUser }) {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [file, setFile] = useState(null);
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
   const socket = useRef();
   const scrollRef = useRef();
 
+  // Determine chat name logic
+  const getChatName = () => {
+    if (currentChat.isGroup) return currentChat.name;
+    const other = currentChat.members.find(m => m._id !== currentUser._id);
+    return other ? other.username : "Unknown";
+  };
+
   useEffect(() => {
     socket.current = io("http://localhost:5000");
-    socket.current.emit("join_room", currentUser._id);
+    // Join conversation room
+    if(currentChat) {
+        socket.current.emit("join_room", currentChat._id);
+    }
     
     socket.current.on("receive_message", (data) => {
-       if (data.sender === currentChat?._id || data.receiver === currentChat?._id) {
+        // Only append if it belongs to THIS conversation
+       if (data.conversationId === currentChat?._id) {
           setMessages((prev) => [...prev, data]);
        }
     });
@@ -28,7 +41,7 @@ export default function ChatWindow({ currentChat, currentUser }) {
     const getMessages = async () => {
       try {
         if(currentChat){
-           const res = await axios.get(`http://localhost:5000/api/messages/${currentUser._id}/${currentChat._id}`);
+           const res = await axios.get(`http://localhost:5000/api/messages/${currentChat._id}`);
            setMessages(res.data);
         }
       } catch (err) {
@@ -36,7 +49,7 @@ export default function ChatWindow({ currentChat, currentUser }) {
       }
     };
     getMessages();
-  }, [currentChat, currentUser]);
+  }, [currentChat]);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -63,13 +76,14 @@ export default function ChatWindow({ currentChat, currentUser }) {
 
     const message = {
       sender: currentUser._id,
-      receiver: currentChat._id,
+      conversationId: currentChat._id, // Updated to conversationId
       text: newMessage,
       fileUrl,
       type,
       timestamp: Date.now()
     };
     
+    // Emit to room (conversationId)
     socket.current.emit("send_message", message);
 
     try {
@@ -89,13 +103,20 @@ export default function ChatWindow({ currentChat, currentUser }) {
   if (!currentChat) return <div className="flex-1 flex items-center justify-center text-gray-500 text-xl">Select a chat to start messaging</div>;
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#efeae2]">
+    <div className="flex-1 flex flex-col h-full bg-[#efeae2] relative">
       {/* Header */}
-      <div className="p-4 bg-gray-100 border-b flex items-center">
-         <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center mr-3 text-white font-bold text-lg">
-              {currentChat.username.charAt(0).toUpperCase()}
-          </div>
-        <span className="font-bold text-gray-700">{currentChat.username}</span>
+      <div className="p-4 bg-gray-100 border-b flex items-center justify-between">
+         <div className="flex items-center">
+            <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center mr-3 text-white font-bold text-lg">
+                  {getChatName().charAt(0).toUpperCase()}
+            </div>
+            <span className="font-bold text-gray-700">{getChatName()}</span>
+         </div>
+         {currentChat.isGroup && (
+             <button onClick={() => setShowGroupInfo(true)} className="text-sm text-green-600 hover:underline">
+                 Group Info
+             </button>
+         )}
       </div>
 
       {/* Messages */}
@@ -126,7 +147,6 @@ export default function ChatWindow({ currentChat, currentUser }) {
             </div>
         )}
         <form onSubmit={handleSubmit} className="w-full flex gap-2 items-center">
-            {/* File Upload Placeholder */}
              <label htmlFor="fileInput" className="cursor-pointer text-gray-500 hover:text-gray-700 p-2">
                 📎
              </label>
@@ -143,6 +163,14 @@ export default function ChatWindow({ currentChat, currentUser }) {
           </button>
         </form>
       </div>
+      
+      {showGroupInfo && (
+          <GroupInfo 
+            currentChat={currentChat} 
+            currentUser={currentUser} 
+            onClose={() => setShowGroupInfo(false)} 
+          />
+      )}
     </div>
   );
 }

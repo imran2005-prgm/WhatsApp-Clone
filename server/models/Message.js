@@ -6,10 +6,15 @@ const MessageSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
-  receiver: {
+
+  conversationId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: 'Conversation',
     required: true
+  },
+  receiver: { // Deprecated, but keeping for backward compat if needed, or we can make it optional
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
   text: {
     type: String,

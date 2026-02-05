@@ -44,6 +44,11 @@ export const AuthContextProvider = ({ children }) => {
     setUser(null);
   };
 
+  const loginSuccess = (user) => {
+    setUser(user);
+    localStorage.setItem('user', JSON.stringify(user));
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -52,7 +57,8 @@ export const AuthContextProvider = ({ children }) => {
         error,
         loginCall,
         registerCall,
-        logout
+        logout,
+        loginSuccess
       }}
     >
       {children}

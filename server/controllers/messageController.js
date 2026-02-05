@@ -25,26 +25,17 @@ exports.addMessage = async (req, res) => {
 
 exports.getMessages = async (req, res) => {
   try {
-    // Get messages between two users or in a conversation
-    // Ideally we filter by sender and receiver
-    const { senderId, receiverId } = req.params;
+    const { conversationId } = req.params;
     
     // Try MongoDB first
     try {
       const messages = await Message.find({
-        $or: [
-          { sender: senderId, receiver: receiverId },
-          { sender: receiverId, receiver: senderId }
-        ]
+        conversationId: conversationId
       });
       res.status(200).json(messages);
     } catch (mongoErr) {
-      // Fallback to demo mode
-      const messages = demoData.messages.filter(m =>
-        (m.sender === senderId && m.receiver === receiverId) ||
-        (m.sender === receiverId && m.receiver === senderId)
-      );
-      res.status(200).json(messages);
+      // Fallback to demo mode (not fully supported for convoId transition yet)
+       res.status(500).json({message: "Demo mode not supported for conversations yet"});
     }
   } catch (err) {
     res.status(500).json(err);

@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Otp = require('../models/Otp');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const demoData = require('../demoData');
@@ -83,6 +84,70 @@ exports.login = async (req, res) => {
       res.status(200).json({ user: userData, token });
     }
   } catch (err) {
+    res.status(500).json(err);
+  }
+};
+
+exports.sendOtp = async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    if (!phoneNumber) return res.status(400).json({ message: "Phone number required" });
+
+    // Generate 6 digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Save or update OTP
+    await Otp.findOneAndUpdate(
+      { phoneNumber },
+      { otp, createdAt: Date.now() },
+      { upsert: true, new: true }
+    );
+
+    // console.log for "sending"
+    console.log(`OTP for ${phoneNumber}: ${otp}`);
+
+    res.status(200).json({ message: "OTP sent successfully" });
+  } catch (err) {
+    res.status(500).json(err);
+  }
+};
+
+exports.verifyOtp = async (req, res) => {
+  try {
+    const { phoneNumber, otp } = req.body;
+    
+    // Validate OTP
+    const validOtp = await Otp.findOne({ phoneNumber, otp });
+    if (!validOtp) return res.status(400).json({ message: "Invalid or expired OTP" });
+
+    // Find or create user
+    let user = await User.findOne({ phoneNumber });
+    let isNewUser = false;
+
+    if (!user) {
+      // Create new user with placeholder data
+      const suffix = phoneNumber.slice(-4);
+      const newUser = new User({
+        username: `user_${phoneNumber}`,
+        email: `${phoneNumber}@phone.com`,
+        password: await bcrypt.hash(Math.random().toString(36), 10), // Random password
+        phoneNumber
+      });
+      user = await newUser.save();
+      isNewUser = true;
+    }
+
+    // Generate token
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'secretkey', { expiresIn: '1d' });
+    const { password: _, ...userData } = user._doc;
+
+    // Delete used OTP
+    await Otp.deleteOne({ _id: validOtp._id });
+
+    res.status(200).json({ user: userData, token, isNewUser });
+
+  } catch (err) {
+    console.error(err);
     res.status(500).json(err);
   }
 };

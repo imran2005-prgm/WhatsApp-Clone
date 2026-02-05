@@ -24,11 +24,13 @@ const authRoute = require('./routes/auth');
 const messageRoute = require('./routes/messages');
 const userRoute = require('./routes/users');
 const uploadRoute = require('./routes/upload');
+const conversationRoute = require('./routes/conversations');
 
 app.use('/api/auth', authRoute);
 app.use('/api/messages', messageRoute);
 app.use('/api/users', userRoute);
 app.use('/api/upload', uploadRoute);
+app.use('/api/conversations', conversationRoute);
 
 // Database Connection
 if (process.env.MONGO_URI && process.env.MONGO_URI.trim() !== "") {
@@ -47,14 +49,14 @@ if (process.env.MONGO_URI && process.env.MONGO_URI.trim() !== "") {
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  socket.on("join_room", (userId) => {
-    socket.join(userId);
-    console.log(`User with ID: ${userId} joined room: ${userId}`);
+  socket.on("join_room", (room) => {
+    socket.join(room);
+    console.log(`User/Socket joined room: ${room}`);
   });
 
   socket.on("send_message", (data) => {
-    // data: { sender, receiver, text, fileUrl, type, timestamp }
-    socket.to(data.receiver).emit("receive_message", data);
+    // data: { sender, conversationId, text, ... }
+    socket.to(data.conversationId).emit("receive_message", data);
   });
 
   socket.on("disconnect", () => {
